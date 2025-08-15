@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tender Management</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="spinnerOverlay" class="spinner-overlay hidden">
+    <div class="spinner"></div>
+  </div>
+
+  <header class="app-header">
+    <h1>Tender Management</h1>
+    <nav class="tabs" role="tablist" aria-label="Main navigation">
+      <button class="tab-btn active" data-screen="createTender" aria-selected="true">Create Tender</button>
+      <button class="tab-btn" data-screen="manageTenders" aria-selected="false">Manage Tenders</button>
+      <button class="tab-btn" data-screen="createTxn" aria-selected="false">Create Transaction</button>
+      <button class="tab-btn" data-screen="manageTxns" aria-selected="false">Manage Transactions</button>
+      <button class="tab-btn" data-screen="tenderSummary" aria-selected="false">Tender Summary</button>  
+    </nav>
+  </header>
+
+  <main id="screens">
+    <!-- Screen 1: Create Tender -->
+    <section id="createTender" class="screen visible fade-in" aria-labelledby="tab-createTender">
+      <div class="card slide-up">
+        <h2>Create Tender</h2>
+        <form id="tenderForm" autocomplete="off" novalidate>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="tenderId">Tender ID</label>
+              <input type="text" id="tenderId" placeholder="e.g. TD-001" readonly />
+              <small>Auto-generated identifier (TD-001...)</small>
+            </div>
+
+            <div class="form-group">
+              <label for="tenderName">Tender Name</label>
+              <input type="text" id="tenderName" placeholder="e.g. Road Construction" required />
+              <small>Name/title of the tender</small>
+            </div>
+
+            <div class="form-group span-2">
+              <label for="tenderDesc">Tender Description</label>
+              <textarea id="tenderDesc" rows="3" placeholder="Brief description"></textarea>
+              <small>Brief description of the tender</small>
+            </div>
+
+            <!-- <div class="form-group">
+              <label for="tenderType">Tender Type</label>
+              <select id="tenderType">
+                <option value="Government">Government</option>
+                <option value="Private">Private</option>
+              </select>
+              <small>Type of tender</small>
+            </div>   -->
+
+            <div class="form-group">
+              <label for="tenderCity">Tender City</label>
+              <input type="text" id="tenderCity" placeholder="e.g. Mumbai" />
+              <small>City where the tender is issued</small>
+            </div>
+
+            <div class="form-group">
+              <label for="tenderPincode">Tender Pincode</label>
+              <input type="text" id="tenderPincode" inputmode="numeric" pattern="\\d{6}" placeholder="6-digit code" />
+              <small>Postal code of the tender location</small>
+            </div>
+
+            <div class="form-group">
+              <label for="tenderValue">Tender Value</label>
+              <input type="number" id="tenderValue" min="0" step="0.01" placeholder="e.g. 1500000" />
+              <small>Estimated monetary value of the tender</small>
+            </div>
+
+            <div class="form-group">
+              <label for="tenderDate">Tender Date & Time (IST)</label>
+              <input type="datetime-local" id="tenderDate" readonly />
+              <small>Captured at creation; not editable</small>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="saveTenderBtn">Save Tender</button>
+            <button type="reset" class="btn" id="resetTenderBtn">Reset</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Screen 2: Manage Tenders -->
+    <section id="manageTenders" class="screen" aria-labelledby="tab-manageTenders">
+      <div class="card fade-in">
+        <div class="header-row">
+          <h2>Manage Tenders</h2>
+          <div class="actions-right">
+            <input type="search" id="tenderSearch" class="search" placeholder="Search tenders..." />
+          </div>
+        </div>
+        <div class="table-wrap slide-up">
+          <table id="tenderTable">
+            <thead>
+              <tr>
+                <th>Tender ID</th>
+                <th>Tender Name</th>
+                <th>Tender Description</th>
+                <!-- <th>Tender Type</th> -->
+                <th>Tender City</th>
+                <th>Tender Pincode</th>
+                <th>Tender Value</th>
+                <th>Tender Date (IST)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody><!-- rows injected by JS --></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 3: Create Transaction -->
+    <section id="createTxn" class="screen" aria-labelledby="tab-createTxn">
+      <div class="card slide-up">
+        <h2>Create Transaction</h2>
+        <form id="txnForm" autocomplete="off" novalidate>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="txnId">Transaction ID</label>
+              <input type="text" id="txnId" placeholder="e.g. TD-001-TX001" readonly />
+              <small>Auto-generated per tender (TD-001-TX001...)</small>
+            </div>
+
+            <div class="form-group">
+              <label for="txnTenderId">Linked Tender ID</label>
+              <select id="txnTenderId"></select>
+              <small>Select from existing tenders</small>
+            </div>
+
+            <div class="form-group span-2">
+              <label for="txnDesc">Description</label>
+              <textarea id="txnDesc" rows="3" placeholder="Details about the transaction"></textarea>
+              <small>Details about the transaction</small>
+            </div>
+
+            <div class="form-group">
+              <label for="txnType">Credit / Debit</label>
+              <select id="txnType">
+                <option value="Credit">Credit</option>
+                <option value="Debit">Debit</option>
+              </select>
+              <small>Credit or Debit</small>
+            </div>
+
+            <div class="form-group">
+              <label for="vendorName">Vendor Name</label>
+              <input type="text" id="vendorName" placeholder="e.g. ABC Constructions" />
+              <small>Name of the vendor involved</small>
+            </div>
+
+            <!-- <div class="form-group">
+              <label for="paymentMode">Payment Mode</label>
+              <select id="paymentMode">
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+              </select>
+              <small>Mode of payment</small>
+            </div>  -->
+
+            <div class="form-group">
+              <label for="amount">Amount</label>
+              <input type="number" id="amount" min="0" step="0.01" placeholder="e.g. 25000" />
+              <small>Transaction amount</small>
+            </div>
+
+            <div class="form-group">
+              <label for="txnDate">Transaction Date & Time (IST)</label>
+              <input type="datetime-local" id="txnDate" readonly/>
+              <small>Transaction date & time</small>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn primary" id="saveTxnBtn">Save Transaction</button>
+            <button type="reset" class="btn">Reset</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Screen 4: Manage Transactions -->
+    <section id="manageTxns" class="screen" aria-labelledby="tab-manageTxns">
+      <div class="card fade-in">
+        <div class="header-row">
+          <h2>Manage Transactions</h2>
+          <div class="actions-right">
+            <button class="btn primary" id="exportTxnPdfBtn">Export PDF</button>
+            <input type="search" id="txnSearch" class="search" placeholder="Search transactions..." />
+          </div>
+        </div>
+
+        <!-- <-----added for tender id filter----------------------->
+        <div class="filter-row" style="margin:10px 0; display:flex; gap:20px; align-items:center;">
+      <label for="tenderIdSelect">Tender ID:</label>
+      <select id="tenderIdSelect">
+        <option value="all">All</option>
+        <!-- JS will populate tenders -->
+      </select>
+
+      <label for="tenderNameInput">Tender Name:</label>
+      <input type="text" id="tenderNameInput" readonly />
+    </div>
+
+        <div class="table-wrap slide-up">
+          <table id="txnTable">
+            <thead>
+              <tr>
+                <th>Transaction ID</th>
+                <th>Tender ID</th>
+                <th>Description</th>
+                <th>Credit/Debit</th>
+                <th>Vendor Name</th>
+                <!-- <th>Payment Mode</th> -->
+                <th>Amount</th>
+                <th>Transaction Date (IST)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody><!-- rows injected by JS --></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pagination" style="margin-top:10px; display:flex; justify-content:flex-end; gap:10px;">
+  <button id="prevPageBtn" class="btn">Previous</button>
+  <span id="pageInfo">Page 1</span>
+  <button id="nextPageBtn" class="btn">Next</button>
+</div>
+</section>
+
+<section id="tenderSummary" class="screen visible">
+      <div class="card fade-in">
+        <h2>Tender Summary</h2>
+
+        <!-- <div class="filter-row">
+          <label for="summaryTenderId">Tender ID:</label>
+          <select id="summaryTenderId">
+            <option value="all">All</option>
+          </select>
+
+          <label for="summaryTenderName">Tender Name:</label>
+          <input type="text" id="summaryTenderName" readonly>
+        </div> -->
+
+        <div class="filter-row" style="margin:10px 0; display:flex; gap:20px; align-items:center;">
+      <label for="tenderIdSelect">Tender ID:</label>
+      <select id="tenderIdSelect">
+        <option value="all">All</option>
+        <!-- JS will populate tenders -->
+      </select>
+
+      <label for="tenderNameInput">Tender Name:</label>
+      <input type="text" id="tenderNameInput" readonly />
+    </div>
+
+        <div class="table-wrap slide-up">
+          <table id="summaryTable">
+            <thead>
+              <tr>
+                <th>Tender ID</th>
+                <th>Tender Name</th>
+                <th>Total Credit</th>
+                <th>Total Debit</th>
+                <th>Credit - Debit</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Confirm Modal -->
+  <dialog id="confirmDialog" class="dialog">
+    <form method="dialog">
+      <h3 id="confirmTitle">Confirm</h3>
+      <p id="confirmMessage">Are you sure?</p>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn">Cancel</button>
+        <button value="ok" class="btn danger">Delete</button>
+      </div>
+    </form>
+  </dialog>
+  
+<!-- jsPDF & autoTable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <script src="script.js"></script>
+
+</body>
+</html>

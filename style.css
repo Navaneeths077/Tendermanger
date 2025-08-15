@@ -1,0 +1,271 @@
+:root{
+  --bg:#0b1020;
+  --card:#121a33;
+  --muted:#9aa4c7;
+  --text:#eef2ff;
+  --primary:#5b8cff;
+  --primary-600:#4778f1;
+  --danger:#ff6b6b;
+  --ring: rgba(91,140,255,0.35);
+  --ok:#35d39a;
+  --shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Helvetica Neue", sans-serif;
+  background: radial-gradient(1200px 800px at 20% -10%, #1a244d 0%, transparent 60%) , var(--bg);
+  color:var(--text);
+}
+
+.app-header{
+  position:sticky; top:0; z-index:5;
+  backdrop-filter:saturate(1.2) blur(6px);
+  background:linear-gradient(180deg, rgba(11,16,32,0.85), rgba(11,16,32,0.6));
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  padding:16px 20px;
+  display:grid; gap:10px;
+}
+.app-header h1{margin:0; font-size:1.4rem; letter-spacing:.3px}
+
+.tabs{display:flex; flex-wrap:wrap; gap:8px}
+.tab-btn{
+  padding:10px 14px; border:1px solid rgba(255,255,255,0.1);
+  background:transparent; color:var(--text);
+  border-radius:999px; cursor:pointer;
+  transition:transform .15s ease, background .2s ease, border-color .2s ease;
+}
+.tab-btn:hover{transform:translateY(-1px)}
+.tab-btn.active{
+  background:linear-gradient(180deg, var(--primary), var(--primary-600));
+  border-color:transparent;
+  box-shadow:0 6px 20px var(--ring);
+}
+
+main{padding:22px; max-width:1200px; margin:0 auto}
+.screen{display:none; animation-duration:.5s; animation-fill-mode:both}
+.screen.visible{display:block}
+
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px; padding:18px; box-shadow:var(--shadow);
+}
+
+.header-row{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.search{
+  width:260px; max-width:60vw;
+  background:#0d1430; color:var(--text); border:1px solid rgba(255,255,255,0.08);
+  padding:10px 12px; border-radius:12px; outline:none;
+}
+.search:focus{box-shadow:0 0 0 4px var(--ring); border-color:transparent}
+
+.form-grid{
+  display:grid; grid-template-columns: repeat(2, minmax(0,1fr));
+  gap:14px;
+}
+.form-group{display:flex; flex-direction:column; gap:8px}
+.form-group span{font-size:.9rem}
+.form-group small{color:var(--muted)}
+.span-2{grid-column: span 2}
+
+label{font-weight:600}
+input, select, textarea{
+  width:100%;
+  background:#0d1430; color:var(--text);
+  border:1px solid rgba(255,255,255,0.08);
+  padding:10px 12px; border-radius:12px; outline:none;
+}
+textarea{resize:vertical}
+input:focus, select:focus, textarea:focus{
+  box-shadow:0 0 0 4px var(--ring); border-color:transparent
+}
+
+.form-actions{margin-top:14px; display:flex; gap:10px}
+.btn{
+  padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.08);
+  background:#10183a; color:var(--text); cursor:pointer;
+  transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
+}
+.btn:hover{transform: translateY(-1px)}
+.btn:active{transform: translateY(0)}
+.btn.primary{
+  background:linear-gradient(180deg, var(--primary), var(--primary-600));
+  border:0; box-shadow:0 8px 24px var(--ring);
+}
+.btn.danger{
+  background:linear-gradient(180deg, #ff7979, #f16262);
+  border:0; box-shadow:0 8px 24px rgba(255,105,105,.25);
+}
+
+.table-wrap{overflow:auto; border-radius:12px; border:1px solid rgba(255,255,255,0.08)}
+table{width:100%; border-collapse:collapse; min-width:900px}
+th, td{padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.06); vertical-align:top}
+thead th{
+  position:sticky; top:0; z-index:1; background:#10183a;
+  text-align:left; font-weight:700
+}
+tbody tr:hover{background:rgba(255,255,255,0.03)}
+td .row-actions{display:flex; gap:8px}
+.badge{
+  padding:4px 8px; border-radius:999px; border:1px solid rgba(255,255,255,0.12); font-size:.85rem
+}
+
+/* Toast */
+.toast{
+  position:fixed; bottom:22px; right:22px;
+  background:#0d1430; color:var(--text); border:1px solid rgba(255,255,255,0.08);
+  padding:12px 14px; border-radius:12px; box-shadow:var(--shadow);
+  transform:translateY(20px); opacity:0; pointer-events:none;
+}
+.toast.show{animation: toast-in .7s forwards}
+@keyframes toast-in{
+  0%{opacity:0; transform: translateY(20px) scale(.98)}
+  40%{opacity:1; transform: translateY(0) scale(1)}
+  80%{opacity:1}
+  100%{opacity:0; transform: translateY(10px); }
+}
+
+/* Dialog (native <dialog>) */
+dialog::backdrop{background:rgba(0,0,0,.55); animation: fade .2s}
+.dialog{
+  border:1px solid rgba(255,255,255,.12); border-radius:16px;
+  background:#0d1430; color:var(--text); padding:18px; width:min(420px, 92vw);
+  box-shadow:var(--shadow); animation: pop .2s ease-out;
+}
+.dialog h3{margin:0 0 6px 0}
+.dialog-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:12px}
+
+/* Animations (requested "ANIMATE THIS") */
+.fade-in{animation: fade .45s ease-out}
+.slide-up{animation: slide-up .6s cubic-bezier(.2,.9,.2,1)}
+.flash{animation: flash .8s}
+.row-added{animation: row-pop .5s ease-out}
+.pulse-once{animation: pulse .6s ease-out}
+
+@keyframes fade{from{opacity:0} to{opacity:1}}
+@keyframes slide-up{
+  0%{opacity:0; transform: translateY(16px)}
+  100%{opacity:1; transform: translateY(0)}
+}
+@keyframes flash{
+  0%{background: rgba(53,211,154,.15)}
+  100%{background: transparent}
+}
+@keyframes row-pop{
+  0%{transform: scale(.98); background: rgba(91,140,255,.12)}
+  100%{transform: scale(1); background: transparent}
+}
+@keyframes pop{
+  0%{transform: translateY(8px) scale(.98); opacity:0}
+  100%{transform: translateY(0) scale(1); opacity:1}
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(53,211,154,.0)}
+  50%{box-shadow:0 0 0 8px rgba(53,211,154,.25)}
+  100%{box-shadow:0 0 0 0 rgba(53,211,154,.0)}
+}
+
+/* Responsive */
+@media (max-width: 800px){
+  .form-grid{grid-template-columns:1fr}
+  .span-2{grid-column: auto}
+}
+
+#createTxn {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#createTxn.visible {
+  opacity: 1;
+}
+
+/* Manage Transactions Table */
+#txnTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* keeps columns fixed */
+}
+
+#txnTable th,
+#txnTable td {
+  /* border: 1px solid #ccc; */
+  padding: 8px;
+  overflow-wrap: break-word; /* wrap long text */
+  word-break: break-word;
+  vertical-align: top;       /* align text at top */
+  white-space: normal;       /* allow wrapping */
+}
+
+/* Fixed column widths */
+#txnTable th:nth-child(1),
+#txnTable td:nth-child(1) { width: 100px; }  /* Transaction ID */
+#txnTable th:nth-child(2),
+#txnTable td:nth-child(2) { width: 120px; }  /* Linked Tender ID */
+#txnTable th:nth-child(3),
+#txnTable td:nth-child(3) { width: 250px; }  /* Description */
+#txnTable th:nth-child(4),
+#txnTable td:nth-child(4) { width: 80px; }   /* Credit/Debit */
+#txnTable th:nth-child(5),
+#txnTable td:nth-child(5) { width: 165px; }  /* Vendor Name */
+#txnTable th:nth-child(6),
+#txnTable td:nth-child(6) { width: 80px; }   /* Amount */
+#txnTable th:nth-child(7),
+#txnTable td:nth-child(7) { width: 120px; }  /* Transaction Date */
+#txnTable th:nth-child(8),
+#txnTable td:nth-child(8) { width: 200px; }  /* Actions */
+
+.filter-row {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.filter-row label {
+  font-weight: bold;
+}
+
+.filter-row select,
+.filter-row input {
+  padding: 5px 8px;
+  font-size: 14px;
+}
+
+/* Spinner Overlay */
+.spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(11,16,32,0.8); /* matches your app theme */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.3s ease;
+}
+
+.spinner-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Animated spinner */
+.spinner {
+  border: 6px solid rgba(255,255,255,0.1);
+  border-top: 6px solid #5b8cff; /* primary color */
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg);}
+  100% { transform: rotate(360deg);}
+}
+

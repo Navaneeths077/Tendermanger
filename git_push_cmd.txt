@@ -1,0 +1,25 @@
+# Initialize Git repository
+git init
+
+# Connect to your GitHub repository
+git remote add origin https://github.com/your-username/repo-name.git
+
+# Check which files have changed
+git status
+
+# Stage all changes (or use git add filename for specific files)
+git add .
+
+# Commit changes with a message
+git commit -m "Your descriptive commit message"
+
+# Push to GitHub (main branch)
+git push origin main
+
+# First pull latest changes
+git pull origin main
+
+# Then push again
+git push origin main
+
+git push -f origin main
