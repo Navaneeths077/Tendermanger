@@ -23,10 +23,10 @@ async function loadState(){
     const tendersResponse = await fetch(`${GOOGLE_SCRIPT_URL}?action=loadTenders`);
     const tendersData = await tendersResponse.json();
     
-    if (tendersData.success) {
+    if (tendersData.status === "success") {
       tenders = tendersData.data || [];
     } else {
-      console.error('Error loading tenders:', tendersData.error);
+      console.error('Error loading tenders:', tendersData.message);
       tenders = [];
     }
     
@@ -34,10 +34,10 @@ async function loadState(){
     const transactionsResponse = await fetch(`${GOOGLE_SCRIPT_URL}?action=loadTransactions`);
     const transactionsData = await transactionsResponse.json();
     
-    if (transactionsData.success) {
+    if (transactionsData.status === "success") {
       transactions = transactionsData.data || [];
     } else {
-      console.error('Error loading transactions:', transactionsData.error);
+      console.error('Error loading transactions:', transactionsData.message);
       transactions = [];
     }
   } catch (error) {
@@ -66,8 +66,8 @@ async function saveState(){
     });
     
     const tendersResult = await tendersResponse.json();
-    if (!tendersResult.success) {
-      console.error('Error saving tenders:', tendersResult.error);
+    if (tendersResult.status !== "success") {
+      console.error('Error saving tenders:', tendersResult.message);
       showToast('Error saving tenders data');
       return;
     }
@@ -83,8 +83,8 @@ async function saveState(){
     });
     
     const transactionsResult = await transactionsResponse.json();
-    if (!transactionsResult.success) {
-      console.error('Error saving transactions:', transactionsResult.error);
+    if (transactionsResult.status !== "success") {
+      console.error('Error saving transactions:', transactionsResult.message);
       showToast('Error saving transactions data');
       return;
     }
