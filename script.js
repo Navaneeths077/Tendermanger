@@ -1,6 +1,8 @@
 // ---- Config ----
 const LS_TENDERS_KEY = 'tenders_v1';
 const LS_TXNS_KEY = 'transactions_v1';
+// Google Apps Script Web App URL
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrFDJvOLTQJ4bU1ODyPfU6aYAgiV96HpywE048LnhwO1t0vpavxvd33U0eYYUJVQCa/exec';
 
 // ---- State ----
 let tenders = [];
@@ -12,18 +14,89 @@ let editTxnId = null;        // when editing, store the original Transaction ID
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-function loadState(){
+async function loadState(){
   try {
-    tenders = JSON.parse(localStorage.getItem(LS_TENDERS_KEY)) || [];
-    transactions = JSON.parse(localStorage.getItem(LS_TXNS_KEY)) || [];
-  } catch {
-    tenders = []; transactions = [];
+    // Show spinner while loading
+    showSpinner();
+    
+    // Load tenders
+    const tendersResponse = await fetch(`${GOOGLE_SCRIPT_URL}?action=loadTenders`);
+    const tendersData = await tendersResponse.json();
+    
+    if (tendersData.success) {
+      tenders = tendersData.data || [];
+    } else {
+      console.error('Error loading tenders:', tendersData.error);
+      tenders = [];
+    }
+    
+    // Load transactions
+    const transactionsResponse = await fetch(`${GOOGLE_SCRIPT_URL}?action=loadTransactions`);
+    const transactionsData = await transactionsResponse.json();
+    
+    if (transactionsData.success) {
+      transactions = transactionsData.data || [];
+    } else {
+      console.error('Error loading transactions:', transactionsData.error);
+      transactions = [];
+    }
+  } catch (error) {
+    console.error('Error loading state from Google Apps Script:', error);
+    // Fallback to empty arrays
+    tenders = [];
+    transactions = [];
+  } finally {
+    hideSpinner();
   }
 }
 
-function saveState(){
-  localStorage.setItem(LS_TENDERS_KEY, JSON.stringify(tenders));
-  localStorage.setItem(LS_TXNS_KEY, JSON.stringify(transactions));
+async function saveState(){
+  try {
+    // Show spinner while saving
+    showSpinner();
+    
+    // Save tenders
+    const tendersFormData = new FormData();
+    tendersFormData.append('action', 'saveTenders');
+    tendersFormData.append('data', JSON.stringify(tenders));
+    
+    const tendersResponse = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: tendersFormData
+    });
+    
+    const tendersResult = await tendersResponse.json();
+    if (!tendersResult.success) {
+      console.error('Error saving tenders:', tendersResult.error);
+      showToast('Error saving tenders data');
+      return;
+    }
+    
+    // Save transactions
+    const transactionsFormData = new FormData();
+    transactionsFormData.append('action', 'saveTransactions');
+    transactionsFormData.append('data', JSON.stringify(transactions));
+    
+    const transactionsResponse = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: transactionsFormData
+    });
+    
+    const transactionsResult = await transactionsResponse.json();
+    if (!transactionsResult.success) {
+      console.error('Error saving transactions:', transactionsResult.error);
+      showToast('Error saving transactions data');
+      return;
+    }
+    
+    // Success
+    console.log('Data saved successfully to Google Drive');
+  } catch (error) {
+    console.error('Error saving state to Google Apps Script:', error);
+    showToast('Error saving data to Google Drive');
+  } finally {
+    hideSpinner();
+  }
 }
 
 function showToast(msg){
@@ -265,14 +338,14 @@ async function onDeleteTender(e){
   // delete linked transactions
   transactions = transactions.filter(tx => tx.tenderId !== id);
 
-  saveState();
+  await saveState();
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
   showToast('Tender and linked transactions deleted');
 }
 
-function handleTenderSubmit(e){
+async function handleTenderSubmit(e){
   e.preventDefault();
   const tender = {
     tenderId: $('#tenderId').value.trim() || getNextTenderId(),
@@ -315,7 +388,7 @@ function handleTenderSubmit(e){
     showToast('Tender saved');
   }
 
-  saveState();
+  await saveState();
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
@@ -398,12 +471,12 @@ async function onDeleteTxn(e){
   if(!ok) return;
 
   transactions = transactions.filter(x=> x.txnId !== id);
-  saveState();
+  await saveState();
   renderTxnTable($('#txnSearch').value);
   showToast('Transaction deleted');
 }
 
-function handleTxnSubmit(e){
+async function handleTxnSubmit(e){
   e.preventDefault();
   
   const txn = {
@@ -439,7 +512,7 @@ function handleTxnSubmit(e){
     showToast('Transaction saved');
   }
 
-  saveState();
+  await saveState();
   renderTxnTable($('#txnSearch').value);
 
   // animation feedback
@@ -533,22 +606,12 @@ function initForms(){
 //Add a small demo entry at first-run for UX
 function firstTimeUX(){
   if(tenders.length === 0){
-    // tenders.push({
-    //   tenderId:'TD-001',
-    //   tenderName:'Sample Road Work',
-    //   tenderDesc:'Demo tender for onboarding',
-    //   // tenderType:'Government',
-    //   tenderCity:'Pune',
-    //   tenderPincode:'411001',
-    //   tenderValue: 500000,
-    //   tenderDate: new Date().toISOString()
-    // });
-    // saveState();
+    
   }
 }
 
-document.addEventListener('DOMContentLoaded', ()=>{
-  loadState();
+document.addEventListener('DOMContentLoaded', async ()=>{
+  await loadState();
   firstTimeUX();
   initTabs();
   initForms();
@@ -564,62 +627,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   renderTenderDropdown();
 });
 
-// <----------------------------------1-pdf------------------------------------>
-// async function exportTxnTableToPDF() {
-//   const { jsPDF } = window.jspdf;
-//   const doc = new jsPDF('p', 'pt', 'a4'); // portrait
 
-//   doc.setFontSize(16);
-//   doc.text('Tenders & Transactions Report', 40, 40);
-
-//   tenders.forEach((tender, index) => {
-//     if (index > 0) doc.addPage(); // start each tender on a new page
-
-//     let yPos = 60;
-
-//     // Tender details
-//     doc.setFont(undefined, 'bold');
-//     doc.setFontSize(12);
-//     doc.text(`Tender ID: ${tender.tenderId}`, 40, yPos);
-//     doc.setFont(undefined, 'normal');
-//     doc.text(`Name: ${tender.tenderName || ''}`, 200, yPos);
-//     doc.text(`City: ${tender.tenderCity || ''}`, 400, yPos);
-//     yPos += 18;
-//     doc.text(`Pincode: ${tender.tenderPincode || ''}`, 40, yPos);
-//     doc.text(`Value: ${tender.tenderValue ?? ''}`, 200, yPos);
-//     doc.text(`Date: ${formatISOToISTDisplay(tender.tenderDate)}`, 400, yPos);
-//     yPos += 25;
-
-//     // Transactions for this tender
-//     const txnList = transactions.filter(tx => tx.tenderId === tender.tenderId);
-//     if (txnList.length) {
-//       const headers = ['Txn ID', 'Description', 'Type', 'Vendor', 'Amount', 'Date'];
-//       const data = txnList.map(tx => [
-//         tx.txnId,
-//         tx.txnDesc || '',
-//         tx.txnType || '',
-//         tx.vendorName || '',
-//         tx.amount ?? '',
-//         formatISOToISTDisplay(tx.txnDate)
-//       ]);
-
-//       doc.autoTable({
-//         head: [headers],
-//         body: data,
-//         startY: yPos,
-//         theme: 'grid',
-//         headStyles: { fillColor: [91, 140, 255] },
-//         styles: { fontSize: 10 },
-//         margin: { left: 40 }
-//       });
-
-//     } else {
-//       doc.text('No transactions found', 50, yPos);
-//     }
-//   });
-
-//   doc.save(`Tenders_Transactions_${new Date().toISOString().slice(0,10)}.pdf`);
-// }
 
 //<------------------------------2-pdf---------------------------------------->
 
@@ -636,79 +644,8 @@ document.getElementById('exportTxnPdfBtn').addEventListener('click', () => {
   exportTxnTableToPDF(filteredTxns);
 });
 
-// async function exportTxnTableToPDF() {
-//   const { jsPDF } = window.jspdf;
-//   const doc = new jsPDF('p', 'pt', 'a4');
-//   const margin = 40;
 
-//   doc.setFontSize(16);
-//   doc.text('Tenders & Transactions Report', margin, 40);
 
-//   let yPos = 60;
-
-//   for (let index = 0; index < tenders.length; index++) {
-//     const tender = tenders[index];
-
-//     doc.setFont(undefined, 'bold');
-//     doc.setFontSize(12);
-//     doc.text(`Tender ID: ${tender.tenderId}`, margin, yPos);
-//     doc.setFont(undefined, 'normal');
-
-//     doc.text(`Name: ${tender.tenderName || ''}`, margin + 160, yPos);
-//     doc.text(`City: ${tender.tenderCity || ''}`, margin + 360, yPos);
-//     yPos += 18;
-//     doc.text(`Pincode: ${tender.tenderPincode || ''}`, margin, yPos);
-//     doc.text(`Value: ${tender.tenderValue ?? ''}`, margin + 160, yPos);
-//     doc.text(`Date: ${formatISOToISTDisplay(tender.tenderDate)}`, margin + 360, yPos);
-//     yPos += 25;
-
-//     const txnList = transactions.filter(tx => tx.tenderId === tender.tenderId);
-
-//     if (txnList.length) {
-//       const headers = ['Txn ID', 'Description', 'Type', 'Vendor', 'Amount', 'Date'];
-//       const data = txnList.map(tx => [
-//         tx.txnId,
-//         tx.txnDesc || '',
-//         tx.txnType || '',
-//         tx.vendorName || '',
-//         tx.amount ?? '',
-//         formatISOToISTDisplay(tx.txnDate)
-//       ]);
-
-//       doc.autoTable({
-//         head: [headers],
-//         body: data,
-//         startY: yPos,
-//         theme: 'grid',
-//         headStyles: { fillColor: [91, 140, 255] },
-//         styles: { fontSize: 10, overflow: 'linebreak', cellPadding: 3 }, 
-//         margin: { left: margin, right: margin },
-//         columnStyles: {
-//           0: { cellWidth: 60 },   // Txn ID
-//           1: { cellWidth: 150 },  // Description - wrap
-//           2: { cellWidth: 60 },   // Type
-//           3: { cellWidth: 100 },  // Vendor - wrap
-//           4: { cellWidth: 60 },   // Amount
-//           5: { cellWidth: 80 }    // Date
-//         },
-//         didDrawPage: (data) => {
-//           yPos = data.cursor.y + 20; // update for next content
-//         }
-//       });
-//     } else {
-//       doc.text('No transactions found', margin, yPos);
-//       yPos += 20;
-//     }
-
-//     // Add a page if next tender does not fit
-//     if (index < tenders.length - 1) {
-//       doc.addPage();
-//       yPos = 40;
-//     }
-//   }
-
-//   doc.save(`Tenders_Transactions_${new Date().toISOString().slice(0,10)}.pdf`);
-// }
 
 async function exportTxnTableToPDF(filteredTxns) {
   const { jsPDF } = window.jspdf;
@@ -1090,7 +1027,7 @@ function hideSpinner() {
   }
 }
 
-// Example usage:
+
 
 // Show spinner before a task
 showSpinner();
