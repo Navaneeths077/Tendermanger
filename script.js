@@ -461,7 +461,6 @@ function onEditTxn(e){
     console.log("Pre-selected tender:", tenderSelect.value);
   }
 
-
   $('#txnId').value = x.txnId;
 
   
