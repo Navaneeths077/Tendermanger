@@ -292,14 +292,15 @@ function renderTxnTable(filterText = ''){
       console.error("Error: Element with ID 'allTxnTable' or its tbody was not found.");
       return; // Exit function if element is not found
   }
-  // tbody.innerHTML = '';
-  const tbody = $('#allTxnTable tbody');
+
+  //const tbody = $('#allTxnTable tbody');
 // Add a check to make sure the element was found
 if (tbody) {
     tbody.innerHTML = '';
 } else {
     console.error("The table body element (#allTxnTable tbody) was not found.");
 }
+  // tbody.innerHTML = '';
   const q = filterText.trim().toLowerCase();
 
   transactions
