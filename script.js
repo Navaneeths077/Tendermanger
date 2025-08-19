@@ -1,7 +1,7 @@
 // ---- Config ----
 // Removed LS_TENDERS_KEY and LS_TXNS_KEY as we are no longer using localStorage directly.
 // IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
-const APP_SCRIPT_URL = 'YOUR_APP_SCRIPT_WEB_APP_URL_HERE'; 
+const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwaXBso-9dn9VP-1TpS1iu8by-2WuPGeivTn2H1G1o/dev'; 
 
 // ---- State ----
 let tenders = [];
