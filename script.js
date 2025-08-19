@@ -287,7 +287,8 @@ function renderTenderTable(filterText = ''){
 // Renders the table for "View All Transactions" tab
 // CORRECTED: Added null check for robustness
 function renderTxnTable(filterText = ''){
-  const tbody = $('#allTxnTable tbody');
+  // const tbody = $('#allTxnTable tbody');
+  const tbody = $('#txnTable tbody');
   if (!tbody) {
       console.error("Error: Element with ID 'allTxnTable' or its tbody was not found.");
       return; // Exit function if element is not found
