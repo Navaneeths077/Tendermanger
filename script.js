@@ -1,7 +1,4 @@
-// ---- Config ----
-// Removed LS_TENDERS_KEY and LS_TXNS_KEY as we are no longer using localStorage directly.
-// IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
-const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwaXBso-9dn9VP-1TpS1iu8by-2WuPGeivTn2H1G1o/dev'; 
+const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrFDJvOLTQJ4bU1ODyPfU6aYAgiV96HpywE048LnhwO1t0vpavxvd33U0eYYUJVQCa/exec';
 
 // ---- State ----
 let tenders = [];
@@ -13,91 +10,20 @@ let editTxnId = null;        // when editing, store the original Transaction ID
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-/**
- * Loads application state (tenders and transactions) from Google Drive
- * via the deployed Google Apps Script.
- */
-async function loadState(){
-  showSpinner(); // Show spinner while loading
-  try {
-    const response = await fetch(APP_SCRIPT_URL, {
-      method: 'GET', // Use GET for loading data
-      // No body needed for GET, as parameters can be in the URL if needed,
-      // but our Apps Script handles both data types in a single GET.
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    
-    // Ensure data structure is as expected, handle potential errors from Apps Script
-    if (data.error) {
-      console.error('Error from Apps Script:', data.error);
-      showToast('Error loading data from Drive. Check console.');
-      tenders = [];
-      transactions = [];
-    } else {
-      tenders = data.tenders || [];
-      transactions = data.transactions || [];
-      showToast('Data loaded from Drive');
-    }
-
-  } catch (error) {
-    console.error('Failed to load state from Google Drive:', error);
-    showToast('Failed to load data from Drive. Using empty data.');
-    tenders = []; // Fallback to empty arrays on error
-    transactions = [];
-  } finally {
-    hideSpinner(); // Hide spinner after loading
-  }
-}
-
-/**
- * Saves application state (tenders and transactions) to Google Drive
- * via the deployed Google Apps Script.
- */
-async function saveState(){
-  showSpinner(); // Show spinner while saving
-  try {
-    const payload = {
-      tenders: tenders,
-      transactions: transactions
-    };
-
-    const response = await fetch(APP_SCRIPT_URL, {
-      method: 'POST', // Use POST for saving data
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload), // Send all data as a JSON string
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const result = await response.json();
-    
-    if (result.status === 'success') {
-      showToast('Data saved to Drive');
-    } else {
-      console.error('Error from Apps Script:', result.message);
-      showToast('Error saving data to Drive. Check console.');
-    }
-
-  } catch (error) {
-    console.error('Failed to save state to Google Drive:', error);
-    showToast('Failed to save data to Drive.');
-  } finally {
-    hideSpinner(); // Hide spinner after saving
-  }
-}
-
-function showToast(msg){
+function showToast(msg, isError = false){
   const toast = $('#toast');
   toast.textContent = msg;
+  // Add an error class for visual distinction if it's an error
+  if (isError) {
+    toast.classList.add('error');
+  } else {
+    toast.classList.remove('error');
+  }
   toast.classList.add('show');
-  setTimeout(()=> toast.classList.remove('show'), 2400);
+  setTimeout(()=> {
+    toast.classList.remove('show');
+    toast.classList.remove('error'); // Remove error class after hide
+  }, 3000); // Increased duration for better visibility
 }
 
 function confirmDialog({title="Confirm", message="Are you sure?"}) {
@@ -113,7 +39,90 @@ function confirmDialog({title="Confirm", message="Are you sure?"}) {
   });
 }
 
-// ---- Date/time helpers (IST) ----
+/**
+ * Loads application state (tenders and transactions) from Google Drive
+ * via the deployed Google Apps Script.
+ */
+async function loadState(){
+  console.log("Attempting to load state from Google Drive...");
+  showSpinner(); // Show spinner while loading
+  try {
+    const response = await fetch(APP_SCRIPT_URL, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.error(`Network response was not ok: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch data: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    
+    // Check for explicit errors from Apps Script
+    if (data.error) {
+      console.error('Error reported by Apps Script:', data.error);
+      showToast(`Error loading data from Drive: ${data.error}`, true);
+      tenders = [];
+      transactions = [];
+    } else {
+      tenders = data.tenders || [];
+      transactions = data.transactions || [];
+      showToast('Data loaded from Drive successfully!');
+      console.log('Tenders loaded:', tenders);
+      console.log('Transactions loaded:', transactions);
+    }
+
+  } catch (error) {
+    console.error('Failed to load state from Google Drive:', error);
+    showToast(`Failed to load data from Drive: ${error.message}. Check console for details.`, true);
+    tenders = []; // Fallback to empty arrays on error
+    transactions = [];
+  } finally {
+    hideSpinner(); // Hide spinner after loading
+  }
+}
+
+
+
+async function saveState(){
+  console.log("Attempting to save state to Google Drive...");
+  showSpinner(); // Show spinner while saving
+  try {
+    const payload = {
+      tenders: tenders,
+      transactions: transactions
+    };
+
+    const response = await fetch(APP_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      console.error(`Network response was not ok: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to save data: ${response.status} ${response.statusText}`);
+    }
+    const result = await response.json();
+    
+    if (result.status === 'success') {
+      showToast('Data saved to Drive successfully!');
+      console.log('Save operation successful.');
+    } else {
+      console.error('Error reported by Apps Script during save:', result.message);
+      showToast(`Error saving data to Drive: ${result.message}`, true);
+    }
+
+  } catch (error) {
+    console.error('Failed to save state to Google Drive:', error);
+    showToast(`Failed to save data to Drive: ${error.message}. Check console for details.`, true);
+  } finally {
+    hideSpinner(); // Hide spinner after saving
+  }
+}
+
+
 function pad(n){ return String(n).padStart(2, '0'); }
 
 // Return a string suitable for datetime-local input for current IST time
@@ -353,14 +362,14 @@ async function handleTenderSubmit(e){ // Make this function async
   };
 
   // Validation
-  if(!tender.tenderId){ showToast('Tender ID is required'); return; }
-  if(!tender.tenderName){ showToast('Tender Name is required'); return; }
-  if(tender.tenderPincode && !/^\d{6}$/.test(tender.tenderPincode)){ showToast('Pincode must be 6 digits'); return; }
+  if(!tender.tenderId){ showToast('Tender ID is required', true); return; }
+  if(!tender.tenderName){ showToast('Tender Name is required', true); return; }
+  if(tender.tenderPincode && !/^\d{6}$/.test(tender.tenderPincode)){ showToast('Pincode must be 6 digits', true); return; }
 
   if(editTenderId){
     // If user changed tenderId while editing (shouldn't normally since readonly), ensure no duplicate
     if(tender.tenderId !== editTenderId && tenders.some(t=> t.tenderId === tender.tenderId)){
-      showToast('Tender ID already exists'); return;
+      showToast('Tender ID already exists', true); return;
     }
     const idx = tenders.findIndex(t=> t.tenderId === editTenderId);
     if(idx !== -1){
@@ -371,12 +380,12 @@ async function handleTenderSubmit(e){ // Make this function async
       }
     }
     editTenderId = null;
-    $('#saveTenderBtn').textContent = 'Save Tender';
+    $('#saveTenderBtn').textContent = 'Update Tender';
     showToast('Tender updated');
   } else {
     // prevent duplicate IDs
     if (tenders.some(t=> t.tenderId === tender.tenderId)){
-      showToast('Tender ID already exists'); return;
+      showToast('Tender ID already exists', true); return;
     }
     tenders.push(tender);
     showToast('Tender saved');
@@ -405,7 +414,8 @@ function onEditTxn(e){
   const x = transactions.find(t=> t.txnId === id);
   console.log("Found transaction:", x);
   if(!x) {
-    // console.error("Transaction not found!");
+    console.error("Transaction not found for ID:", id); // More specific error
+    showToast("Transaction not found for editing.", true);
     return;
   }
   const editValues = {
@@ -422,9 +432,9 @@ function onEditTxn(e){
     tenderSelect.value = editValues.tenderId;
     console.log("Pre-selected tender:", tenderSelect.value);
   }
-  console.log('edit' || editValues.txnId);
+  // console.log('edit' || editValues.txnId); // This log was potentially misleading
   $('#txnId').value = x.txnId;
-  console.log('txnid' || x.txnId);
+  // console.log('txnid' || x.txnId); // This log was potentially misleading
   
   console.log('edit values:', editValues);
   console.log('txnId to set:', x.txnId);
@@ -485,8 +495,8 @@ async function handleTxnSubmit(e){ // Make this function async
   };
 
   // Validation
-  if(!txn.txnId){ showToast('Transaction ID is required'); return; }
-  if(!txn.tenderId){ showToast('Linked Tender ID is required'); return; }
+  if(!txn.txnId){ showToast('Transaction ID is required', true); return; }
+  if(!txn.tenderId){ showToast('Linked Tender ID is required', true); return; }
 
   if(editTxnId){
     // Update existing transaction
@@ -500,7 +510,7 @@ async function handleTxnSubmit(e){ // Make this function async
   } else {
     // Prevent duplicate txnId
     if(transactions.some(x => x.txnId === txn.txnId)){
-      showToast('Transaction ID already exists'); return;
+      showToast('Transaction ID already exists', true); return;
     }
     transactions.push(txn);
     showToast('Transaction saved');
@@ -1138,9 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// Spinner JS
-
-// Get spinner overlay element
+//
 const spinner = document.getElementById("spinnerOverlay");
 
 // Show spinner
@@ -1150,22 +1158,11 @@ function showSpinner() {
   }
 }
 
-// Hide spinner
+
 function hideSpinner() {
   if (spinner) {
     spinner.classList.add("hidden");
   }
 }
 
-// Example usage:
 
-// Show spinner before a task
-// showSpinner(); // No need to call here, loadState/saveState will handle it
-
-// Simulate async task (like fetching data)
-// setTimeout(() => {
-//   // Task done, hide spinner
-// //   hideSpinner(); // No need to call here
-// }, 2000); // 2 seconds delay, replace with your real task
-
-// No need to close the curly brace here, it closes the entire original script
