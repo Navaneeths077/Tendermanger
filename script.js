@@ -1,7 +1,7 @@
 // ---- Config ----
 // IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
 // It should look something like: https://script.google.com/macros/s/AKfyc.../exec
-const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwW011MjOhIO6uEFkfihtoznmFMkvk-nnsSHVDBdtWwcJ435DgeNHxh6H4wU3Ydw0_d/exec';
+const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJsGtAtnY7zrLmThmDV_aRdGxcuSXaQI5cySdhKxxfFm3gvWtbq199sdxo7zPKYmwA/exec';
 // ---- State ----
 let tenders = [];
 let transactions = [];
@@ -699,7 +699,7 @@ function populateTenderDropdown() {
 
 // Render transactions with pagination for manage transactions (now targeting #manageTxnTable)
 function renderTransactionsPage(page = 1) {
-  const tbody = document.querySelector('#manageTxnTable tbody'); // Changed from #txnTable to #manageTxnTable
+  const tbody = document.querySelector('#txnTable tbody'); // Changed from #txnTable to #manageTxnTable
   tbody.innerHTML = '';
 
   const start = (page - 1) * pageSize;
@@ -947,4 +947,71 @@ function hideSpinner() {
 
 
 
-//
+// Populates the tender dropdown for the summary table
+function populateSummaryTenderDropdown() {
+  const tenderSelect = document.getElementById('summaryTenderSelect');
+  tenderSelect.innerHTML = `<option value="all">All</option>`;
+  tenders.forEach(t => {
+    const option = document.createElement('option');
+    option.value = t.tenderId;
+    option.textContent = `${t.tenderId} - ${t.tenderName}`;
+    tenderSelect.appendChild(option);
+  });
+}
+
+// Computes the summary data for a given tender ID or all tenders
+function computeTenderSummary(tenderId) {
+  let filteredTransactions = [];
+  if (tenderId === 'all') {
+    filteredTransactions = transactions;
+  } else {
+    filteredTransactions = transactions.filter(tx => tx.tenderId === tenderId);
+  }
+
+  const summary = {};
+  filteredTransactions.forEach(tx => {
+    const tenderId = tx.tenderId;
+    if (!summary[tenderId]) {
+      const tender = tenders.find(t => t.tenderId === tenderId);
+      summary[tenderId] = {
+        tenderId: tender.tenderId,
+        tenderName: tender.tenderName,
+        totalCredit: 0,
+        totalDebit: 0
+      };
+    }
+    if (tx.txnType === 'Credit') {
+      summary[tenderId].totalCredit += tx.amount;
+    } else if (tx.txnType === 'Debit') {
+      summary[tenderId].totalDebit += tx.amount;
+    }
+  });
+
+  return Object.values(summary);
+}
+
+// Renders the summary table with pagination
+function renderSummaryTable(page = 1) {
+  const tbody = document.querySelector('#summaryTable tbody');
+  tbody.innerHTML = '';
+
+  const start = (page - 1) * summaryPageSize;
+  const end = start + summaryPageSize;
+  const pageSummaries = summaryTxns.slice(start, end);
+
+  pageSummaries.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${s.tenderId}</td>
+      <td>${s.tenderName}</td>
+      <td>${s.totalCredit}</td>
+      <td>${s.totalDebit}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const pageCount = Math.ceil(summaryTxns.length / summaryPageSize) || 1;
+  document.getElementById('summaryPageInfo').textContent = `Page ${summaryCurrentPage} of ${pageCount}`;
+  document.getElementById('summaryPrevPageBtn').disabled = summaryCurrentPage === 1;
+  document.getElementById('summaryNextPageBtn').disabled = summaryCurrentPage === pageCount;
+}
