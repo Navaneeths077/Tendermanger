@@ -1,8 +1,7 @@
 // ---- Config ----
 // IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
 // It should look something like: https://script.google.com/macros/s/AKfyc.../exec
-const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrFDJvOLTQJ4bU1ODyPfU6aYAgiV96HpywE048LnhwO1t0vpavxvd33U0eYYUJVQCa/exec';
-
+const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwW011MjOhIO6uEFkfihtoznmFMkvk-nnsSHVDBdtWwcJ435DgeNHxh6H4wU3Ydw0_d/exec';
 // ---- State ----
 let tenders = [];
 let transactions = [];
@@ -460,7 +459,7 @@ function onEditTxn(e){
     tenderSelect.value = editValues.tenderId;
     console.log("Pre-selected tender:", tenderSelect.value);
   }
-  
+
   $('#txnId').value = x.txnId;
 
 
