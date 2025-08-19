@@ -460,8 +460,9 @@ function onEditTxn(e){
     tenderSelect.value = editValues.tenderId;
     console.log("Pre-selected tender:", tenderSelect.value);
   }
-
+  
   $('#txnId').value = x.txnId;
+
 
   
   console.log('edit values:', editValues);
@@ -931,6 +932,9 @@ function hideSpinner() {
     spinner.classList.add("hidden");
   }
 }
+
+
+
 
 
 
