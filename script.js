@@ -1,3 +1,6 @@
+// ---- Config ----
+// IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
+// It should look something like: https://script.google.com/macros/s/AKfyc.../exec
 const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyrFDJvOLTQJ4bU1ODyPfU6aYAgiV96HpywE048LnhwO1t0vpavxvd33U0eYYUJVQCa/exec';
 
 // ---- State ----
@@ -5,6 +8,17 @@ let tenders = [];
 let transactions = [];
 let editTenderId = null;     // when editing, store the original Tender ID
 let editTxnId = null;        // when editing, store the original Transaction ID
+
+// Pagination variables for manage transactions
+let currentPage = 1;
+const pageSize = 5;
+let currentTxns = []; // filtered transactions for manage transactions table
+
+// Pagination variables for summary table
+let summaryCurrentPage = 1;
+const summaryPageSize = 10;
+let summaryTxns = []; // filtered data for summary table
+
 
 // ---- Small helpers ----
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -81,8 +95,10 @@ async function loadState(){
   }
 }
 
-
-
+/**
+ * Saves application state (tenders and transactions) to Google Drive
+ * via the deployed Google Apps Script.
+ */
 async function saveState(){
   console.log("Attempting to save state to Google Drive...");
   showSpinner(); // Show spinner while saving
@@ -122,7 +138,7 @@ async function saveState(){
   }
 }
 
-
+// ---- Date/time helpers (IST) ----
 function pad(n){ return String(n).padStart(2, '0'); }
 
 // Return a string suitable for datetime-local input for current IST time
@@ -345,6 +361,10 @@ async function onDeleteTender(e){
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
+  // Also re-render manage transaction and summary tables after changes
+  filterTransactionsByTender(); // Re-filters and renders manageTxn table
+  summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
+  renderSummaryTable(summaryCurrentPage);
   showToast('Tender and linked transactions deleted');
 }
 
@@ -395,6 +415,11 @@ async function handleTenderSubmit(e){ // Make this function async
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
+  // Also re-render manage transaction and summary tables after changes
+  filterTransactionsByTender(); // Re-filters and renders manageTxn table
+  populateSummaryTenderDropdown(); // Repopulate summary dropdown
+  summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
+  renderSummaryTable(summaryCurrentPage);
 
   // small animation feedback
   $('#tenderForm').classList.add('flash');
@@ -477,6 +502,10 @@ async function onDeleteTxn(e){ // Make this function async
   transactions = transactions.filter(x=> x.txnId !== id);
   await saveState(); // AWAIT the save operation
   renderTxnTable($('#txnSearch').value);
+  // Also re-render manage transaction and summary tables after changes
+  filterTransactionsByTender(); // Re-filters and renders manageTxn table
+  summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
+  renderSummaryTable(summaryCurrentPage);
   showToast('Transaction deleted');
 }
 
@@ -505,7 +534,7 @@ async function handleTxnSubmit(e){ // Make this function async
       transactions[idx] = txn;
     }
     editTxnId = null;
-    $('#saveTxnBtn').textContent = 'Save Transaction';
+    $('#saveTxnBtn').textContent = 'Update Transaction';
     showToast('Transaction updated');
   } else {
     // Prevent duplicate txnId
@@ -518,6 +547,11 @@ async function handleTxnSubmit(e){ // Make this function async
 
   await saveState(); // AWAIT the save operation
   renderTxnTable($('#txnSearch').value);
+  // Also re-render manage transaction and summary tables after changes
+  filterTransactionsByTender(); // Re-filters and renders manageTxn table
+  summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
+  renderSummaryTable(summaryCurrentPage);
+
 
   // animation feedback
   $('#txnForm').classList.add('flash');
@@ -566,6 +600,16 @@ function initTabs(){
         $('#saveTxnBtn').textContent = 'Save Transaction';
         $('#txnDate').value = nowISTDatetimeLocal();
         $('#txnId').value = '';
+      }
+      // When manageTxn or summary tab is clicked, re-render their tables
+      if(target === 'manageTxn') {
+        populateTenderDropdown(); // Re-populates the filter dropdown
+        filterTransactionsByTender(); // Re-filters and renders the table
+      }
+      if(target === 'summary') {
+        populateSummaryTenderDropdown();
+        summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
+        renderSummaryTable(summaryCurrentPage);
       }
     });
   });
@@ -624,82 +668,140 @@ async function firstTimeUX(){ // Make this async as it might trigger a saveState
   }
 }
 
-document.addEventListener('DOMContentLoaded', async ()=>{ // Make DOMContentLoaded listener async
-  await loadState(); // AWAIT the load operation
-  await firstTimeUX(); // AWAIT firstTimeUX
+// Pagination functions for manage transactions
+// Populate Tender dropdown for manage transactions
+function populateTenderDropdown() {
+  const tenderSelect = document.getElementById('tenderIdSelect');
+  tenderSelect.innerHTML = `<option value="all">All</option>`;
+  tenders.forEach(t => {
+    const option = document.createElement('option');
+    option.value = t.tenderId;
+    option.textContent = `${t.tenderId} - ${t.tenderName}`;
+    tenderSelect.appendChild(option);
+  });
+}
+
+// Render transactions with pagination for manage transactions
+function renderTransactionsPage(page = 1) {
+  const tbody = document.querySelector('#txnTable tbody');
+  tbody.innerHTML = '';
+
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const pageTxns = currentTxns.slice(start, end);
+
+  pageTxns.forEach(tx => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${tx.txnId}</td>
+      <td>${tx.tenderId}</td>
+      <td>${tx.txnDesc}</td>
+      <td>${tx.txnType}</td>
+      <td>${tx.vendorName}</td>
+      <td>${tx.amount}</td>
+      <td>${formatISOToISTDisplay(tx.txnDate)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn" data-action="edit" data-id="${tx.txnId}">Edit</button>
+          <button class="btn danger" data-action="delete" data-id="${tx.txnId}">Delete</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Update page info
+  const pageCount = Math.ceil(currentTxns.length / pageSize) || 1;
+  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${pageCount}`;
+
+  // Disable buttons at limits
+  document.getElementById('prevPageBtn').disabled = currentPage === 1;
+  document.getElementById('nextPageBtn').disabled = currentPage === pageCount;
+}
+
+// Filter transactions based on dropdown for manage transactions
+function filterTransactionsByTender() {
+  const tenderSelect = document.getElementById('tenderIdSelect');
+  const selectedId = tenderSelect.value;
+  const tenderNameInput = document.getElementById('tenderNameInput');
+
+  if (selectedId === 'all') {
+    tenderNameInput.value = '';
+    currentTxns = transactions;
+  } else {
+    const tender = tenders.find(t => t.tenderId === selectedId);
+    tenderNameInput.value = tender ? tender.tenderName : '';
+    currentTxns = transactions.filter(tx => tx.tenderId === selectedId);
+  }
+
+  currentPage = 1; // reset to first page
+  renderTransactionsPage(currentPage);
+}
+
+
+// Consolidated DOMContentLoaded listener
+document.addEventListener('DOMContentLoaded', async ()=>{
+  console.log("DOM Content Loaded. Initializing app...");
+  await loadState(); // AWAIT the load operation first!
+  await firstTimeUX(); // AWAIT firstTimeUX (if it ever triggers a save)
+
   initTabs();
   initForms();
   initSearch();
 
-  // initial values for create forms
+  // Initial values for create forms - ensure they run AFTER data is loaded
   $('#tenderId').value = getNextTenderId();
   $('#tenderDate').value = nowISTDatetimeLocal();
   $('#txnDate').value = nowISTDatetimeLocal();
+  // No auto-generate for txnId on load unless a tender is pre-selected
 
+  // Initial render of tables - ensure they run AFTER data is loaded
   renderTenderTable();
-  renderTxnTable();
-  renderTenderDropdown();
+  renderTxnTable(); // This is the 'main' txn table, not the paginated one
+  renderTenderDropdown(); // For createTxn tab
+
+  // Initialize manage transactions table and pagination
+  populateTenderDropdown(); // Populates filter dropdown for manageTxn
+  filterTransactionsByTender(); // Filters and renders the manageTxn table
+
+  // Initialize summary table and pagination
+  populateSummaryTenderDropdown(); // Populates filter dropdown for summary
+  summaryTxns = computeTenderSummary('all'); // Computes summary for 'all' initially
+  renderSummaryTable(summaryCurrentPage);
+
+  // Attach pagination button listeners (ensure they are attached once)
+  document.getElementById('prevPageBtn').addEventListener('click', () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderTransactionsPage(currentPage);
+    }
+  });
+
+  document.getElementById('nextPageBtn').addEventListener('click', () => {
+    const pageCount = Math.ceil(currentTxns.length / pageSize);
+    if (currentPage < pageCount) {
+      currentPage++;
+      renderTransactionsPage(currentPage);
+    }
+  });
+
+  document.getElementById('summaryPrevPageBtn').addEventListener('click', () => {
+    if (summaryCurrentPage > 1) {
+      summaryCurrentPage--;
+      renderSummaryTable(summaryCurrentPage);
+    }
+  });
+
+  document.getElementById('summaryNextPageBtn').addEventListener('click', () => {
+    const pageCount = Math.ceil(summaryTxns.length / summaryPageSize);
+    if (summaryCurrentPage < pageCount) {
+      summaryCurrentPage++;
+      renderSummaryTable(summaryCurrentPage);
+    }
+  });
 });
 
-// <----------------------------------1-pdf------------------------------------>
-// async function exportTxnTableToPDF() {
-//   const { jsPDF } = window.jspdf;
-//   const doc = new jsPDF('p', 'pt', 'a4'); // portrait
-
-//   doc.setFontSize(16);
-//   doc.text('Tenders & Transactions Report', 40, 40);
-
-//   tenders.forEach((tender, index) => {
-//     if (index > 0) doc.addPage(); // start each tender on a new page
-
-//     let yPos = 60;
-
-//     // Tender details
-//     doc.setFont(undefined, 'bold');
-//     doc.setFontSize(12);
-//     doc.text(`Tender ID: ${tender.tenderId}`, 40, yPos);
-//     doc.setFont(undefined, 'normal');
-//     doc.text(`Name: ${tender.tenderName || ''}`, 200, yPos);
-//     doc.text(`City: ${tender.tenderCity || ''}`, 400, yPos);
-//     yPos += 18;
-//     doc.text(`Pincode: ${tender.tenderPincode || ''}`, 40, yPos);
-//     doc.text(`Value: ${tender.tenderValue ?? ''}`, 200, yPos);
-//     doc.text(`Date: ${formatISOToISTDisplay(tender.tenderDate)}`, 400, yPos);
-//     yPos += 25;
-
-//     // Transactions for this tender
-//     const txnList = transactions.filter(tx => tx.tenderId === tender.tenderId);
-//     if (txnList.length) {
-//       const headers = ['Txn ID', 'Description', 'Type', 'Vendor', 'Amount', 'Date'];
-//       const data = txnList.map(tx => [
-//         tx.txnId,
-//         tx.txnDesc || '',
-//         tx.txnType || '',
-//         tx.vendorName || '',
-//         tx.amount ?? '',
-//         formatISOToISTDisplay(tx.txnDate)
-//       ]);
-
-//       doc.autoTable({
-//         head: [headers],
-//         body: data,
-//         startY: yPos,
-//         theme: 'grid',
-//         headStyles: { fillColor: [91, 140, 255] },
-//         styles: { fontSize: 10 },
-//         margin: { left: 40 }
-//       });
-
-//     } else {
-//       doc.text('No transactions found', 50, yPos);
-//     }
-//   });
-
-//   doc.save(`Tenders_Transactions_${new Date().toISOString().slice(0,10)}.pdf`);
-// }
-
-//<------------------------------2-pdf---------------------------------------->
-
+// PDF Export Functionality (Remains unchanged in logic)
 document.getElementById('exportTxnPdfBtn').addEventListener('click', () => {
   const selectedId = document.getElementById('tenderIdSelect').value;
 
@@ -713,79 +815,7 @@ document.getElementById('exportTxnPdfBtn').addEventListener('click', () => {
   exportTxnTableToPDF(filteredTxns);
 });
 
-// async function exportTxnTableToPDF() {
-//   const { jsPDF } = window.jspdf;
-//   const doc = new jsPDF('p', 'pt', 'a4');
-//   const margin = 40;
 
-//   doc.setFontSize(16);
-//   doc.text('Tenders & Transactions Report', margin, 40);
-
-//   let yPos = 60;
-
-//   for (let index = 0; index < tenders.length; index++) {
-//     const tender = tenders[index];
-
-//     doc.setFont(undefined, 'bold');
-//     doc.setFontSize(12);
-//     doc.text(`Tender ID: ${tender.tenderId}`, margin, yPos);
-//     doc.setFont(undefined, 'normal');
-
-//     doc.text(`Name: ${tender.tenderName || ''}`, margin + 160, yPos);
-//     doc.text(`City: ${tender.tenderCity || ''}`, margin + 360, yPos);
-//     yPos += 18;
-//     doc.text(`Pincode: ${tender.tenderPincode || ''}`, margin, yPos);
-//     doc.text(`Value: ${tender.tenderValue ?? ''}`, margin + 160, yPos);
-//     doc.text(`Date: ${formatISOToISTDisplay(tender.tenderDate)}`, margin + 360, yPos);
-//     yPos += 25;
-
-//     const txnList = transactions.filter(tx => tx.tenderId === tender.tenderId);
-
-//     if (txnList.length) {
-//       const headers = ['Txn ID', 'Description', 'Type', 'Vendor', 'Amount', 'Date'];
-//       const data = txnList.map(tx => [
-//         tx.txnId,
-//         tx.txnDesc || '',
-//         tx.txnType || '',
-//         tx.vendorName || '',
-//         tx.amount ?? '',
-//         formatISOToISTDisplay(tx.txnDate)
-//       ]);
-
-//       doc.autoTable({
-//         head: [headers],
-//         body: data,
-//         startY: yPos,
-//         theme: 'grid',
-//         headStyles: { fillColor: [91, 140, 255] },
-//         styles: { fontSize: 10, overflow: 'linebreak', cellPadding: 3 }, 
-//         margin: { left: margin, right: margin },
-//         columnStyles: {
-//           0: { cellWidth: 60 },   // Txn ID
-//           1: { cellWidth: 150 },  // Description - wrap
-//           2: { cellWidth: 60 },   // Type
-//           3: { cellWidth: 100 },  // Vendor - wrap
-//           4: { cellWidth: 60 },   // Amount
-//           5: { cellWidth: 80 }    // Date
-//         },
-//         didDrawPage: (data) => {
-//           yPos = data.cursor.y + 20; // update for next content
-//         }
-//       });
-//     } else {
-//       doc.text('No transactions found', margin, yPos);
-//       yPos += 20;
-//     }
-
-//     // Add a page if next tender does not fit
-//     if (index < tenders.length - 1) {
-//       doc.addPage();
-//       yPos = 40;
-//     }
-//   }
-
-//   doc.save(`Tenders_Transactions_${new Date().toISOString().slice(0,10)}.pdf`);
-// }
 
 async function exportTxnTableToPDF(filteredTxns) {
   const { jsPDF } = window.jspdf;
@@ -871,284 +901,10 @@ async function exportTxnTableToPDF(filteredTxns) {
   doc.save(`Tenders_Transactions_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
-// attach event
-$('#exportTxnPdfBtn').addEventListener('click', exportTxnTableToPDF);
 
-//<--------manage tender filter------------------------>
-// Example: populate Tender ID dropdown
+// Spinner JS
 
-// Call this on page load
-populateTenderDropdown();
-renderTransactions(transactions);
-
-// manageTxns.js
-
-// Example data (replace with actual data or fetch from API)
-
-function formatISOToISTDisplay(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-  }
-
-function populateTenderDropdown() {
-  const tenderSelect = document.getElementById('tenderIdSelect');
-  tenderSelect.innerHTML = `<option value="all">All</option>`;
-  tenders.forEach(t => {
-    const option = document.createElement('option');
-    option.value = t.tenderId;
-    option.textContent = `${t.tenderId} - ${t.tenderName}`;
-    tenderSelect.appendChild(option);
-  });
-}
-
-function renderTransactions(txns) {
-  const tbody = document.querySelector('#txnTable tbody');
-  tbody.innerHTML = '';
-  txns.forEach(tx => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${tx.txnId}</td>
-      <td>${tx.tenderId}</td>
-      <td>${tx.txnDesc}</td>
-      <td>${tx.txnType}</td>
-      <td>${tx.vendorName}</td>
-      <td>${tx.amount}</td>
-      <td>${formatISOToISTDisplay(tx.txnDate)}</td>
-      <td></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-// Initialize after DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  populateTenderDropdown();
-  renderTransactions(transactions);
-
-  document.getElementById('tenderIdSelect').addEventListener('change', (e) => {
-    const selectedId = e.target.value;
-    const tenderNameInput = document.getElementById('tenderNameInput');
-
-    if (selectedId === 'all') {
-      tenderNameInput.value = '';
-      renderTransactions(transactions);
-    } else {
-      const tender = tenders.find(t => t.tenderId === selectedId);
-      tenderNameInput.value = tender ? tender.tenderName : '';
-      const filteredTxns = transactions.filter(tx => tx.tenderId === selectedId);
-      renderTransactions(filteredTxns);
-    }
-  });
-});
-
-
-//<-----nextpagemanagetxn----------------------?
-
-// Pagination variables
-let currentPage = 1;
-const pageSize = 5;
-let currentTxns = []; // filtered transactions
-
-// Populate Tender dropdown
-function populateTenderDropdown() {
-  const tenderSelect = document.getElementById('tenderIdSelect');
-  tenderSelect.innerHTML = `<option value="all">All</option>`;
-  tenders.forEach(t => {
-    const option = document.createElement('option');
-    option.value = t.tenderId;
-    option.textContent = `${t.tenderId} - ${t.tenderName}`;
-    tenderSelect.appendChild(option);
-  });
-}
-
-// Render transactions with pagination
-function renderTransactionsPage(page = 1) {
-  const tbody = document.querySelector('#txnTable tbody');
-  tbody.innerHTML = '';
-
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
-  const pageTxns = currentTxns.slice(start, end);
-
-  pageTxns.forEach(tx => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${tx.txnId}</td>
-      <td>${tx.tenderId}</td>
-      <td>${tx.txnDesc}</td>
-      <td>${tx.txnType}</td>
-      <td>${tx.vendorName}</td>
-      <td>${tx.amount}</td>
-      <td>${formatISOToISTDisplay(tx.txnDate)}</td>
-      <td></td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  // Update page info
-  const pageCount = Math.ceil(currentTxns.length / pageSize) || 1;
-  document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${pageCount}`;
-
-  // Disable buttons at limits
-  document.getElementById('prevPageBtn').disabled = currentPage === 1;
-  document.getElementById('nextPageBtn').disabled = currentPage === pageCount;
-}
-
-// Filter transactions based on dropdown
-function filterTransactionsByTender() {
-  const tenderSelect = document.getElementById('tenderIdSelect');
-  const selectedId = tenderSelect.value;
-  const tenderNameInput = document.getElementById('tenderNameInput');
-
-  if (selectedId === 'all') {
-    tenderNameInput.value = '';
-    currentTxns = transactions;
-  } else {
-    const tender = tenders.find(t => t.tenderId === selectedId);
-    tenderNameInput.value = tender ? tender.tenderName : '';
-    currentTxns = transactions.filter(tx => tx.tenderId === selectedId);
-  }
-
-  currentPage = 1; // reset to first page
-  renderTransactionsPage(currentPage);
-}
-
-// Pagination buttons
-document.getElementById('prevPageBtn').addEventListener('click', () => {
-  if (currentPage > 1) {
-    currentPage--;
-    renderTransactionsPage(currentPage);
-  }
-});
-
-document.getElementById('nextPageBtn').addEventListener('click', () => {
-  const pageCount = Math.ceil(currentTxns.length / pageSize);
-  if (currentPage < pageCount) {
-    currentPage++;
-    renderTransactionsPage(currentPage);
-  }
-});
-
-// Initialize after DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  populateTenderDropdown();
-  filterTransactionsByTender(); // sets initial currentTxns and renders first page
-
-  document.getElementById('tenderIdSelect').addEventListener('change', filterTransactionsByTender);
-});
-
-
-// Initial render
-currentTxns = transactions;
-renderTransactionsPage(currentPage);
-
-
-// Variables for pagination
-let summaryCurrentPage = 1;
-const summaryPageSize = 10;
-let summaryTxns = []; // filtered data for table
-
-// Populate Tender dropdown
-function populateSummaryTenderDropdown() {
-  const select = document.getElementById('summaryTenderSelect');
-  select.innerHTML = `<option value="all">All</option>`;
-  tenders.forEach(t => {
-    const option = document.createElement('option');
-    option.value = t.tenderId;
-    option.textContent = `${t.tenderId} - ${t.tenderName}`;
-    select.appendChild(option);
-  });
-}
-
-// Compute summary data
-function computeTenderSummary(selectedTenderId = 'all') {
-  let filteredTenders = selectedTenderId === 'all' ? tenders : tenders.filter(t => t.tenderId === selectedTenderId);
-
-  const summaryData = filteredTenders.map(t => {
-    const tenderTxns = transactions.filter(tx => tx.tenderId === t.tenderId);
-    const totalCredit = tenderTxns.filter(tx => tx.txnType.toLowerCase() === 'credit')
-                                  .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const totalDebit = tenderTxns.filter(tx => tx.txnType.toLowerCase() === 'debit')
-                                 .reduce((sum, tx) => sum + (tx.amount || 0), 0);
-    const net = totalCredit - totalDebit;
-    const status = net >= 0 ? 'Profit' : 'Loss';
-
-    return {
-      tenderId: t.tenderId,
-      tenderName: t.tenderName,
-      totalCredit,
-      totalDebit,
-      netAmount: net,
-      status
-    };
-  });
-
-  return summaryData;
-}
-
-// Render summary table with pagination
-function renderSummaryTable(page = 1) {
-  const tbody = document.querySelector('#summaryTable tbody');
-  tbody.innerHTML = '';
-
-  const start = (page - 1) * summaryPageSize;
-  const end = start + summaryPageSize;
-  const pageData = summaryTxns.slice(start, end);
-
-  pageData.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${item.tenderId}</td>
-      <td>${item.tenderName}</td>
-      <td>${item.totalCredit.toFixed(2)}</td>
-      <td>${item.totalDebit.toFixed(2)}</td>
-      <td>${item.netAmount.toFixed(2)}</td>
-      <td>${item.status}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  const pageCount = Math.ceil(summaryTxns.length / summaryPageSize) || 1;
-  document.getElementById('summaryPageInfo').textContent = `Page ${summaryCurrentPage} of ${pageCount}`;
-  document.getElementById('summaryPrevPageBtn').disabled = summaryCurrentPage === 1;
-  document.getElementById('summaryNextPageBtn').disabled = summaryCurrentPage === pageCount;
-}
-
-// Handle tender selection
-document.getElementById('summaryTenderSelect').addEventListener('change', (e) => {
-  const selectedId = e.target.value;
-  const tender = tenders.find(t => t.tenderId === selectedId);
-  document.getElementById('summaryTenderName').value = tender ? tender.tenderName : '';
-  
-  summaryTxns = computeTenderSummary(selectedId);
-  summaryCurrentPage = 1;
-  renderSummaryTable(summaryCurrentPage);
-});
-
-// Pagination buttons
-document.getElementById('summaryPrevPageBtn').addEventListener('click', () => {
-  if (summaryCurrentPage > 1) {
-    summaryCurrentPage--;
-    renderSummaryTable(summaryCurrentPage);
-  }
-});
-document.getElementById('summaryNextPageBtn').addEventListener('click', () => {
-  const pageCount = Math.ceil(summaryTxns.length / summaryPageSize);
-  if (summaryCurrentPage < pageCount) {
-    summaryCurrentPage++;
-    renderSummaryTable(summaryCurrentPage);
-  }
-});
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-  populateSummaryTenderDropdown();
-  summaryTxns = computeTenderSummary('all');
-  renderSummaryTable(summaryCurrentPage);
-});
-
-
-//
+// Get spinner overlay element
 const spinner = document.getElementById("spinnerOverlay");
 
 // Show spinner
@@ -1158,11 +914,13 @@ function showSpinner() {
   }
 }
 
-
+// Hide spinner
 function hideSpinner() {
   if (spinner) {
     spinner.classList.add("hidden");
   }
 }
+
+
 
 
