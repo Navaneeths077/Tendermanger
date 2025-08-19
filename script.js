@@ -245,6 +245,7 @@ function renderTenderDropdown(){
   if(cur) select.value = cur;
 }
 
+// Renders the table for "View All Transactions" tab
 function renderTenderTable(filterText = ''){
   const tbody = $('#tenderTable tbody');
   tbody.innerHTML = '';
@@ -284,8 +285,10 @@ function renderTenderTable(filterText = ''){
   });
 }
 
+// Renders the table for "View All Transactions" tab
+// NOTE: This function's previous target ID conflict with manageTxnTable, now fixed in HTML expectation
 function renderTxnTable(filterText = ''){
-  const tbody = $('#txnTable tbody');
+  const tbody = $('#allTxnTable tbody'); // Changed from #txnTable to #allTxnTable
   tbody.innerHTML = '';
   const q = filterText.trim().toLowerCase();
 
@@ -314,10 +317,10 @@ function renderTxnTable(filterText = ''){
       tbody.appendChild(tr);
     });
 
-  $$('#txnTable [data-action="edit"]').forEach(btn=>{
+  $$('#allTxnTable [data-action="edit"]').forEach(btn=>{ // Changed from #txnTable to #allTxnTable
     btn.addEventListener('click', onEditTxn);
   });
-  $$('#txnTable [data-action="delete"]').forEach(btn=>{
+  $$('#allTxnTable [data-action="delete"]').forEach(btn=>{ // Changed from #txnTable to #allTxnTable
     btn.addEventListener('click', onDeleteTxn);
   });
 }
@@ -359,7 +362,7 @@ async function onDeleteTender(e){
 
   await saveState(); // AWAIT the save operation
   renderTenderTable($('#tenderSearch').value);
-  renderTxnTable($('#txnSearch').value);
+  renderTxnTable($('#txnSearch').value); // Re-render 'All Transactions' table
   renderTenderDropdown();
   // Also re-render manage transaction and summary tables after changes
   filterTransactionsByTender(); // Re-filters and renders manageTxn table
@@ -413,7 +416,7 @@ async function handleTenderSubmit(e){ // Make this function async
 
   await saveState(); // AWAIT the save operation
   renderTenderTable($('#tenderSearch').value);
-  renderTxnTable($('#txnSearch').value);
+  renderTxnTable($('#txnSearch').value); // Re-render 'All Transactions' table
   renderTenderDropdown();
   // Also re-render manage transaction and summary tables after changes
   filterTransactionsByTender(); // Re-filters and renders manageTxn table
@@ -457,9 +460,10 @@ function onEditTxn(e){
     tenderSelect.value = editValues.tenderId;
     console.log("Pre-selected tender:", tenderSelect.value);
   }
-  // console.log('edit' || editValues.txnId); // This log was potentially misleading
+
+
   $('#txnId').value = x.txnId;
-  // console.log('txnid' || x.txnId); // This log was potentially misleading
+
   
   console.log('edit values:', editValues);
   console.log('txnId to set:', x.txnId);
@@ -501,7 +505,7 @@ async function onDeleteTxn(e){ // Make this function async
 
   transactions = transactions.filter(x=> x.txnId !== id);
   await saveState(); // AWAIT the save operation
-  renderTxnTable($('#txnSearch').value);
+  renderTxnTable($('#txnSearch').value); // Re-render 'All Transactions' table
   // Also re-render manage transaction and summary tables after changes
   filterTransactionsByTender(); // Re-filters and renders manageTxn table
   summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
@@ -546,7 +550,7 @@ async function handleTxnSubmit(e){ // Make this function async
   }
 
   await saveState(); // AWAIT the save operation
-  renderTxnTable($('#txnSearch').value);
+  renderTxnTable($('#txnSearch').value); // Re-render 'All Transactions' table
   // Also re-render manage transaction and summary tables after changes
   filterTransactionsByTender(); // Re-filters and renders manageTxn table
   summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
@@ -617,7 +621,7 @@ function initTabs(){
 
 function initSearch(){
   $('#tenderSearch').addEventListener('input', (e)=> renderTenderTable(e.target.value));
-  $('#txnSearch').addEventListener('input', (e)=> renderTxnTable(e.target.value));
+  $('#txnSearch').addEventListener('input', (e)=> renderTxnTable(e.target.value)); // Now filters #allTxnTable
 }
 
 function initForms(){
@@ -681,9 +685,9 @@ function populateTenderDropdown() {
   });
 }
 
-// Render transactions with pagination for manage transactions
+// Render transactions with pagination for manage transactions (now targeting #manageTxnTable)
 function renderTransactionsPage(page = 1) {
-  const tbody = document.querySelector('#txnTable tbody');
+  const tbody = document.querySelector('#manageTxnTable tbody'); // Changed from #txnTable to #manageTxnTable
   tbody.innerHTML = '';
 
   const start = (page - 1) * pageSize;
@@ -708,6 +712,14 @@ function renderTransactionsPage(page = 1) {
       </td>
     `;
     tbody.appendChild(tr);
+  });
+
+  // Attach action listeners for buttons in #manageTxnTable
+  $$('#manageTxnTable [data-action="edit"]').forEach(btn=>{ // Targeting #manageTxnTable
+    btn.addEventListener('click', onEditTxn);
+  });
+  $$('#manageTxnTable [data-action="delete"]').forEach(btn=>{ // Targeting #manageTxnTable
+    btn.addEventListener('click', onDeleteTxn);
   });
 
   // Update page info
@@ -757,7 +769,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   // Initial render of tables - ensure they run AFTER data is loaded
   renderTenderTable();
-  renderTxnTable(); // This is the 'main' txn table, not the paginated one
+  renderTxnTable(); // This is the 'main' txn table, now targets #allTxnTable
   renderTenderDropdown(); // For createTxn tab
 
   // Initialize manage transactions table and pagination
