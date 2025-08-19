@@ -285,9 +285,13 @@ function renderTenderTable(filterText = ''){
 }
 
 // Renders the table for "View All Transactions" tab
-// NOTE: This function's previous target ID conflict with manageTxnTable, now fixed in HTML expectation
+// CORRECTED: Added null check for robustness
 function renderTxnTable(filterText = ''){
-  const tbody = $('#allTxnTable tbody'); // Changed from #txnTable to #allTxnTable
+  const tbody = $('#allTxnTable tbody');
+  if (!tbody) {
+      console.error("Error: Element with ID 'allTxnTable' or its tbody was not found.");
+      return; // Exit function if element is not found
+  }
   tbody.innerHTML = '';
   const q = filterText.trim().toLowerCase();
 
@@ -316,10 +320,10 @@ function renderTxnTable(filterText = ''){
       tbody.appendChild(tr);
     });
 
-  $$('#allTxnTable [data-action="edit"]').forEach(btn=>{ // Changed from #txnTable to #allTxnTable
+  $$('#allTxnTable [data-action="edit"]').forEach(btn=>{
     btn.addEventListener('click', onEditTxn);
   });
-  $$('#allTxnTable [data-action="delete"]').forEach(btn=>{ // Changed from #txnTable to #allTxnTable
+  $$('#allTxnTable [data-action="delete"]').forEach(btn=>{
     btn.addEventListener('click', onDeleteTxn);
   });
 }
@@ -776,8 +780,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   filterTransactionsByTender(); // Filters and renders the manageTxn table
 
   // Initialize summary table and pagination
-  populateSummaryTenderDropdown(); // Populates filter dropdown for summary
-  summaryTxns = computeTenderSummary('all'); // Computes summary for 'all' initially
+  populateSummaryTenderDropdown();
+  summaryTxns = computeTenderSummary(document.getElementById('summaryTenderSelect').value);
   renderSummaryTable(summaryCurrentPage);
 
   // Attach pagination button listeners (ensure they are attached once)
@@ -933,8 +937,4 @@ function hideSpinner() {
 }
 
 
-
-
-
-
-
+//
