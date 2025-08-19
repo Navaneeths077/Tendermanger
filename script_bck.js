@@ -1,7 +1,6 @@
 // ---- Config ----
-// Removed LS_TENDERS_KEY and LS_TXNS_KEY as we are no longer using localStorage directly.
-// IMPORTANT: Replace this with the Web App URL you get after deploying your Google Apps Script.
-const APP_SCRIPT_URL = 'YOUR_APP_SCRIPT_WEB_APP_URL_HERE'; 
+const LS_TENDERS_KEY = 'tenders_v1';
+const LS_TXNS_KEY = 'transactions_v1';
 
 // ---- State ----
 let tenders = [];
@@ -13,84 +12,18 @@ let editTxnId = null;        // when editing, store the original Transaction ID
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-/**
- * Loads application state (tenders and transactions) from Google Drive
- * via the deployed Google Apps Script.
- */
-async function loadState(){
-  showSpinner(); // Show spinner while loading
+function loadState(){
   try {
-    const response = await fetch(APP_SCRIPT_URL, {
-      method: 'GET', // Use GET for loading data
-      // No body needed for GET, as parameters can be in the URL if needed,
-      // but our Apps Script handles both data types in a single GET.
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    
-    // Ensure data structure is as expected, handle potential errors from Apps Script
-    if (data.error) {
-      console.error('Error from Apps Script:', data.error);
-      showToast('Error loading data from Drive. Check console.');
-      tenders = [];
-      transactions = [];
-    } else {
-      tenders = data.tenders || [];
-      transactions = data.transactions || [];
-      showToast('Data loaded from Drive');
-    }
-
-  } catch (error) {
-    console.error('Failed to load state from Google Drive:', error);
-    showToast('Failed to load data from Drive. Using empty data.');
-    tenders = []; // Fallback to empty arrays on error
-    transactions = [];
-  } finally {
-    hideSpinner(); // Hide spinner after loading
+    tenders = JSON.parse(localStorage.getItem(LS_TENDERS_KEY)) || [];
+    transactions = JSON.parse(localStorage.getItem(LS_TXNS_KEY)) || [];
+  } catch {
+    tenders = []; transactions = [];
   }
 }
 
-/**
- * Saves application state (tenders and transactions) to Google Drive
- * via the deployed Google Apps Script.
- */
-async function saveState(){
-  showSpinner(); // Show spinner while saving
-  try {
-    const payload = {
-      tenders: tenders,
-      transactions: transactions
-    };
-
-    const response = await fetch(APP_SCRIPT_URL, {
-      method: 'POST', // Use POST for saving data
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload), // Send all data as a JSON string
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const result = await response.json();
-    
-    if (result.status === 'success') {
-      showToast('Data saved to Drive');
-    } else {
-      console.error('Error from Apps Script:', result.message);
-      showToast('Error saving data to Drive. Check console.');
-    }
-
-  } catch (error) {
-    console.error('Failed to save state to Google Drive:', error);
-    showToast('Failed to save data to Drive.');
-  } finally {
-    hideSpinner(); // Hide spinner after saving
-  }
+function saveState(){
+  localStorage.setItem(LS_TENDERS_KEY, JSON.stringify(tenders));
+  localStorage.setItem(LS_TXNS_KEY, JSON.stringify(transactions));
 }
 
 function showToast(msg){
@@ -332,14 +265,14 @@ async function onDeleteTender(e){
   // delete linked transactions
   transactions = transactions.filter(tx => tx.tenderId !== id);
 
-  await saveState(); // AWAIT the save operation
+  saveState();
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
   showToast('Tender and linked transactions deleted');
 }
 
-async function handleTenderSubmit(e){ // Make this function async
+function handleTenderSubmit(e){
   e.preventDefault();
   const tender = {
     tenderId: $('#tenderId').value.trim() || getNextTenderId(),
@@ -382,7 +315,7 @@ async function handleTenderSubmit(e){ // Make this function async
     showToast('Tender saved');
   }
 
-  await saveState(); // AWAIT the save operation
+  saveState();
   renderTenderTable($('#tenderSearch').value);
   renderTxnTable($('#txnSearch').value);
   renderTenderDropdown();
@@ -459,18 +392,18 @@ function onEditTxn(e){
 }
 
 
-async function onDeleteTxn(e){ // Make this function async
+async function onDeleteTxn(e){
   const id = e.currentTarget.dataset.id;
   const ok = await confirmDialog({title:'Delete Transaction', message:`Delete Transaction "${id}"?`});
   if(!ok) return;
 
   transactions = transactions.filter(x=> x.txnId !== id);
-  await saveState(); // AWAIT the save operation
+  saveState();
   renderTxnTable($('#txnSearch').value);
   showToast('Transaction deleted');
 }
 
-async function handleTxnSubmit(e){ // Make this function async
+function handleTxnSubmit(e){
   e.preventDefault();
   
   const txn = {
@@ -506,7 +439,7 @@ async function handleTxnSubmit(e){ // Make this function async
     showToast('Transaction saved');
   }
 
-  await saveState(); // AWAIT the save operation
+  saveState();
   renderTxnTable($('#txnSearch').value);
 
   // animation feedback
@@ -598,7 +531,7 @@ function initForms(){
 }
 
 //Add a small demo entry at first-run for UX
-async function firstTimeUX(){ // Make this async as it might trigger a saveState
+function firstTimeUX(){
   if(tenders.length === 0){
     // tenders.push({
     //   tenderId:'TD-001',
@@ -610,13 +543,13 @@ async function firstTimeUX(){ // Make this async as it might trigger a saveState
     //   tenderValue: 500000,
     //   tenderDate: new Date().toISOString()
     // });
-    // await saveState(); // AWAIT the save operation if uncommenting demo data
+    // saveState();
   }
 }
 
-document.addEventListener('DOMContentLoaded', async ()=>{ // Make DOMContentLoaded listener async
-  await loadState(); // AWAIT the load operation
-  await firstTimeUX(); // AWAIT firstTimeUX
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadState();
+  firstTimeUX();
   initTabs();
   initForms();
   initSearch();
@@ -1160,12 +1093,10 @@ function hideSpinner() {
 // Example usage:
 
 // Show spinner before a task
-// showSpinner(); // No need to call here, loadState/saveState will handle it
+showSpinner();
 
 // Simulate async task (like fetching data)
-// setTimeout(() => {
-//   // Task done, hide spinner
-// //   hideSpinner(); // No need to call here
-// }, 2000); // 2 seconds delay, replace with your real task
-
-// No need to close the curly brace here, it closes the entire original script
+setTimeout(() => {
+  // Task done, hide spinner
+  hideSpinner();
+}, 2000); // 2 seconds delay, replace with your real task
